@@ -4,7 +4,6 @@
 //Github is called only once. Both users read this same document.
 
 const mongoose = require('mongoose');
-const { compile } = require('morgan');
 
 //----Sub-schema: one repository's data--------------
 //we don't give it separate collection - it lives INSIDE Analysis document
@@ -47,7 +46,6 @@ const AnalysisSchema = new mongoose.Schema(
     githubUsername:{
         type:String,
         required: true,
-        unique: true,
         lowercase: true,
         trim: true
     },
@@ -95,7 +93,7 @@ const AnalysisSchema = new mongoose.Schema(
     status:{
         type:String,
         enum: ['completed', 'failed'],
-        default: completed,
+        default: "completed",
     },
 
 },{timestamps: true}
@@ -105,4 +103,5 @@ const AnalysisSchema = new mongoose.Schema(
 AnalysisSchema.index({ githubUsername: 1});
 
 const AnalysisModel = mongoose.model('Analysis', AnalysisSchema)
-
+ 
+module.exports = AnalysisModel
