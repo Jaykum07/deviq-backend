@@ -25,9 +25,11 @@ if(process.env.NODE_ENV === 'developement'){
 }
 
 const authRoutes = require('./routes/auth.routes');
+const githubRoutes = require('./routes/github.routes');
 const errorHandler = require('./middleware/errorHandler');
 //routes
 app.use('/api/auth', authRoutes);
+app.use('/api/github', githubRoutes);
 
 // 404 handler
 // app.use('*', (req, res) =>{
