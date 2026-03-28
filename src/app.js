@@ -27,11 +27,13 @@ if(process.env.NODE_ENV === 'developement'){
 const authRoutes = require('./routes/auth.routes');
 const githubRoutes = require('./routes/github.routes');
 const historyRoutes = require('./routes/history.routes');
+const compareRoutes = require('./routes/compare.routes');
 const errorHandler = require('./middleware/errorHandler');
 //routes
 app.use('/api/auth', authRoutes);
 app.use('/api/github', githubRoutes);
 app.use('/api/history', historyRoutes);
+app.use('/api/compare', compareRoutes);
 
 // 404 handler
 // app.use('*', (req, res) =>{
