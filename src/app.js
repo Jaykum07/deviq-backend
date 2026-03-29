@@ -28,20 +28,16 @@ const authRoutes = require('./routes/auth.routes');
 const githubRoutes = require('./routes/github.routes');
 const historyRoutes = require('./routes/history.routes');
 const compareRoutes = require('./routes/compare.routes');
+const reportRoutes = require('./routes/report.routes')
 const errorHandler = require('./middleware/errorHandler');
+
 //routes
 app.use('/api/auth', authRoutes);
 app.use('/api/github', githubRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/compare', compareRoutes);
+app.use('/api/reports', reportRoutes);
 
-// 404 handler
-// app.use('*', (req, res) =>{
-//     res.status(404).json({
-//         success: false,
-//         message: `Route ${req.originalUrl} not found`,
-//     });
-// });
 
 app.use(errorHandler);
 
