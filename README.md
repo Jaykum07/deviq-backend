@@ -37,10 +37,11 @@ DevIQ automates that evaluation process using a custom scoring engine.
 - Secure user registration and login with JWT
 - GitHub profile analysis and scoring
 - Custom performance score (0–100) across 5 dimensions
-- Search history with TTL auto-expiry (90 days)
-- Developer comparison engine
-- Save analysis reports
-- Downloadable PDF reports
+- Search history with pagination and TTL auto-expiry (90 days)
+- Developer comparison engine (2 to 4 developers at once)
+- Save single and comparison reports with frozen snapshots
+- Delete individual or all history entries
+- Downloadable PDF reports (coming soon)
 
 ---
 
@@ -71,9 +72,9 @@ Backend/
     ├── controllers/
     │   ├── auth.controller.js      ← register, login, logout, getMe
     │   ├── github.controller.js    ← analyze GitHub username
-    │   ├── history.controller.js   ← search history (coming soon)
-    │   ├── compare.controller.js   ← compare developers (coming soon)
-    │   └── report.controller.js    ← save/download reports (coming soon)
+    │   ├── history.controller.js   ← get, delete search history
+    │   ├── compare.controller.js   ← compare multiple developers
+    │   └── report.controller.js    ← save, get, delete reports
     ├── middleware/
     │   ├── auth.middleware.js      ← verify JWT token
     │   ├── errorHandler.js         ← global error handler
@@ -86,9 +87,9 @@ Backend/
     ├── routes/
     │   ├── auth.routes.js          ← /api/auth/*
     │   ├── github.routes.js        ← /api/github/*
-    │   ├── history.routes.js       ← /api/history/* (coming soon)
-    │   ├── compare.routes.js       ← /api/compare/* (coming soon)
-    │   └── report.routes.js        ← /api/reports/* (coming soon)
+    │   ├── history.routes.js       ← /api/history/*
+    │   ├── compare.routes.js       ← /api/compare/*
+    │   └── report.routes.js        ← /api/reports/*
     ├── services/
     │   ├── github.service.js       ← all GitHub API calls
     │   └── scoring.service.js      ← score calculation logic
@@ -104,42 +105,41 @@ Backend/
 
 ### Auth Routes — `/api/auth`
 
-| Method | Endpoint            | Access    | Description              |
-|--------|---------------------|-----------|--------------------------|
-| POST   | `/register`         | Public    | Create new account       |
-| POST   | `/login`            | Public    | Login, receive JWT       |
-| GET    | `/me`               | Protected | Get current user profile |
-| POST   | `/logout`           | Protected | Logout, clear token      |
+| Method | Endpoint      | Access    | Description              |
+|--------|---------------|-----------|--------------------------|
+| POST   | `/register`   | Public    | Create new account       |
+| POST   | `/login`      | Public    | Login, receive JWT       |
+| GET    | `/me`         | Protected | Get current user profile |
+| POST   | `/logout`     | Protected | Logout, clear token      |
 
 ### GitHub Routes — `/api/github`
 
-| Method | Endpoint                  | Access    | Description                        |
-|--------|---------------------------|-----------|------------------------------------|
-| POST   | `/analyze/:username`      | Protected | Analyze GitHub profile + score     |
+| Method | Endpoint             | Access    | Description                    |
+|--------|----------------------|-----------|--------------------------------|
+| POST   | `/analyze/:username` | Protected | Analyze GitHub profile + score |
 
-### History Routes — `/api/history` *(coming soon)*
+### History Routes — `/api/history`
 
-| Method | Endpoint    | Access    | Description                        |
-|--------|-------------|-----------|------------------------------------|
-| GET    | `/`         | Protected | Get my search history (paginated)  |
-| DELETE | `/:id`      | Protected | Delete one history entry           |
-| DELETE | `/`         | Protected | Clear all my history               |
+| Method | Endpoint | Access    | Description                       |
+|--------|----------|-----------|-----------------------------------|
+| GET    | `/`      | Protected | Get my search history (paginated) |
+| DELETE | `/:id`   | Protected | Delete one history entry          |
+| DELETE | `/`      | Protected | Clear all my history              |
 
-### Compare Routes — `/api/compare` *(coming soon)*
+### Compare Routes — `/api/compare`
 
-| Method | Endpoint    | Access    | Description                        |
-|--------|-------------|-----------|------------------------------------|
-| POST   | `/`         | Protected | Compare multiple GitHub profiles   |
+| Method | Endpoint | Access    | Description                              |
+|--------|----------|-----------|------------------------------------------|
+| POST   | `/`      | Protected | Compare 2 to 4 GitHub profiles, ranked  |
 
-### Report Routes — `/api/reports` *(coming soon)*
+### Report Routes — `/api/reports`
 
-| Method | Endpoint           | Access    | Description                  |
-|--------|--------------------|-----------|------------------------------|
-| GET    | `/`                | Protected | Get all my saved reports     |
-| POST   | `/`                | Protected | Save a new report            |
-| GET    | `/:id`             | Protected | Get one report               |
-| DELETE | `/:id`             | Protected | Delete a report              |
-| GET    | `/:id/download`    | Protected | Download report as PDF       |
+| Method | Endpoint | Access    | Description                        |
+|--------|-----------|-----------|------------------------------------|
+| POST   | `/`       | Protected | Save single or comparison report   |
+| GET    | `/`       | Protected | Get all my saved reports           |
+| GET    | `/:id`    | Protected | Get one report with full snapshot  |
+| DELETE | `/:id`    | Protected | Delete a report                    |
 
 ---
 
@@ -147,28 +147,41 @@ Backend/
 
 ### Collections
 
-| Collection      | Purpose                                        | Privacy          |
-|-----------------|------------------------------------------------|------------------|
-| `users`         | Platform accounts (recruiters)                 | Each user is separate |
-| `analyses`      | GitHub profile data + scores                   | Shared cache — fetched once for all users |
-| `searchhistories` | Who searched which GitHub username           | Private per user |
-| `reports`       | Saved single and comparison reports            | Private per user |
+| Collection        | Purpose                               | Privacy                            |
+|-------------------|---------------------------------------|------------------------------------|
+| `users`           | Platform accounts (recruiters)        | Each user is separate              |
+| `analyses`        | GitHub profile data + scores          | Shared cache — fetched once        |
+| `searchhistories` | Who searched which GitHub username    | Private per user                   |
+| `reports`         | Saved single and comparison reports   | Private per user                   |
 
-### Key Design Decision
+### Key Design Decisions
+
+**Single database, isolated by userId.**
 One MongoDB database serves all users. Isolation is achieved through
-`userId` field on every private document. When User A queries history,
-the server filters `{ userId: req.user._id }` — User B's data is
-never touched.
+the `userId` field on every private document. When User A queries
+history, the server filters `{ userId: req.user._id }` — User B's
+data is never touched.
 
-### Caching Strategy
+**Caching strategy.**
 GitHub API data is cached in MongoDB for 6 hours. If two recruiters
 search the same developer, GitHub API is called only once. The second
-request reads from the local cache.
+request reads from the local cache. This also protects against
+GitHub's 5000 requests per hour rate limit.
 
-### History Auto-Expiry
+**History auto-expiry.**
 Search history uses MongoDB TTL index — documents older than 90 days
 are automatically deleted by MongoDB's background process. No cron
-job needed.
+job needed. Same pattern used by Google, GitHub, and Amazon.
+
+**Snapshot in reports.**
+When a report is saved, scores are frozen at that moment inside a
+`snapshot` field. Even if the developer pushes more code later, the
+saved report reflects the scores at the time of evaluation. This is
+how a marksheet works — frozen at exam date.
+
+**Comparison ranking.**
+When comparing developers, results are sorted by `totalScore`
+descending. The top result is flagged as `winner` in the response.
 
 ---
 
@@ -197,8 +210,6 @@ npm run dev
 ```
 
 ### Environment Variables
-
-Create a `.env` file in the root directory:
 ```bash
 PORT=5000
 NODE_ENV=development
@@ -224,7 +235,7 @@ Every API response follows this standard format:
 {
   "success": true,
   "message": "GitHub profile analyzed successfully",
-  "data": { ... }
+  "data": { }
 }
 
 // Error
@@ -238,7 +249,10 @@ Every API response follows this standard format:
 
 ## Git Commit History
 ```
-docs: update README with project progress and API endpoints
+docs: update README mark all backend routes complete
+feat: add reports routes - save single and comparison reports with snapshot
+feat: add compare route with ranking and cache reuse
+feat: add search history routes with pagination and delete
 fix:  resolve cachedUntil field name mismatch between model and controller
 fix:  replace findOneAndUpdate with explicit create/update for reliable caching
 feat: add GitHub analyze route with caching and search history
@@ -252,18 +266,26 @@ docs: add README and env example file
 
 ## Current Status
 
+### Backend
 - [x] Project setup and folder structure
-- [x] MongoDB connection
-- [x] User authentication (register, login, logout)
-- [x] JWT middleware (access + refresh tokens)
-- [x] GitHub profile analysis
-- [x] Custom scoring engine (5 dimensions, 0–100)
-- [x] Search history saving with TTL auto-expiry
-- [x] Response caching (6 hour TTL)
-- [ ] Search history routes
-- [ ] Compare developers
-- [ ] Save and download reports
-- [ ] Frontend (React + Vite)
+- [x] MongoDB connection with env validation
+- [x] User authentication — register, login, logout
+- [x] JWT middleware — access token + refresh token
+- [x] GitHub profile analysis with 6 hour caching
+- [x] Custom scoring engine — 5 dimensions, 0 to 100
+- [x] Search history — paginated, TTL auto-expiry 90 days
+- [x] Compare developers — 2 to 4 profiles, auto ranked
+- [x] Save reports — single and comparison with snapshot
+- [x] Get and delete saved reports
+- [ ] PDF report download
+
+### Frontend
+- [ ] React + Vite setup
+- [ ] Login and register pages
+- [ ] Dashboard with search
+- [ ] Analysis result page with score breakdown
+- [ ] Compare page with side by side view
+- [ ] Reports page with saved reports list
 
 ---
 
