@@ -11,7 +11,8 @@ app.use(helmet());
 
 //cors - allow react frontend to call this API
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production' ? process.env.CLIENT_URL : 'http://localhost:3000',
+    origin: "http://localhost:5173", // React dev server
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
 }));
 
