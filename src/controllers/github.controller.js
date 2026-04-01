@@ -1,8 +1,8 @@
-const Analysis      = require('../models/Analysis.model');
-const SearchHistory = require('../models/SearchHistory.model');
-const asyncHandler  = require('../utils/asyncHandler');
-const { analyzeGithubUser }              = require('../services/github.service');
-const { successResponse, errorResponse } = require('../utils/apiResponse');
+const Analysis = require("../models/Analysis.model");
+const SearchHistory = require("../models/SearchHistory.model");
+const asyncHandler = require("../utils/asyncHandler");
+const { analyzeGithubUser } = require("../services/github.service");
+const { successResponse, errorResponse } = require("../utils/apiResponse");
 
 // POST /api/github/analyze/:username
 const analyzeUser = asyncHandler(async (req, res) => {
@@ -18,7 +18,6 @@ const analyzeUser = asyncHandler(async (req, res) => {
 
   if (analysis) {
     console.log(`Cache hit for: ${username}`);
-
   } else {
     // ── 2. No fresh cache — call GitHub API ──────────────────────────────────
     console.log(`Fetching from GitHub API: ${username}`);
@@ -33,44 +32,53 @@ const analyzeUser = asyncHandler(async (req, res) => {
 
       if (existing) {
         // Update existing document
-        existing.profile      = data.profile;
+        existing.profile = data.profile;
         existing.repositories = data.repositories;
-        existing.metrics      = data.metrics;
-        existing.scores       = data.scores;
-        existing.status       = 'completed';
-        existing.cacheUntil  = new Date(Date.now() + 6 * 60 * 60 * 1000);
+        existing.metrics = data.metrics;
+        existing.scores = data.scores;
+        existing.status = "completed";
+        existing.cacheUntil = new Date(Date.now() + 6 * 60 * 60 * 1000);
         analysis = await existing.save();
-
       } else {
         // Create brand new document
         analysis = await Analysis.create({
           githubUsername: username.toLowerCase(),
-          profile:        data.profile,
-          repositories:   data.repositories,
-          metrics:        data.metrics,
-          scores:         data.scores,
-          status:         'completed',
-          cacheUntil:    new Date(Date.now() + 6 * 60 * 60 * 1000),
+          profile: data.profile,
+          repositories: data.repositories,
+          metrics: data.metrics,
+          scores: data.scores,
+          status: "completed",
+          cacheUntil: new Date(Date.now() + 6 * 60 * 60 * 1000),
         });
       }
-
     } catch (err) {
-      if (err.message === 'Not Found') {
+      if (err.message === "Not Found") {
         return errorResponse(res, 404, `GitHub user "${username}" not found`);
       }
       return errorResponse(res, 500, `GitHub API error: ${err.message}`);
     }
   }
 
-  // ── 4. Save to search history ───────────────────────────────────────────────
-  await SearchHistory.create({
-    userId:         req.user._id,
-    githubUsername: username.toLowerCase(),
-    analysisId:     analysis._id,
-  });
+  // ── 4. Save to search history (update if exists, create if not) ───────────────────────────────────────────────
+  await SearchHistory.findOneAndUpdate(
+    {
+      userId: req.user._id, //this user
+      githubUsername: username.toLowerCase(), //this username
+    },
+    {
+      $set: {
+        analysisId: analysis._id,
+        searchedAt: new Date(), //refresh timestamp
+      },
+    },
+    {
+      upsert: true, //create if not exists
+      returnDocument: "after", //return updated doc
+    }
+  );
 
   // ── 5. Return response ──────────────────────────────────────────────────────
-  return successResponse(res, 200, 'GitHub profile analyzed successfully', {
+  return successResponse(res, 200, "GitHub profile analyzed successfully", {
     analysis,
   });
 });
