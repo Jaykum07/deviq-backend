@@ -69,12 +69,31 @@ const compareUsers = asyncHandler(async (req, res) => {
         }
 
         // Save to search history for each username compared
-        await SearchHistory.create({
-          userId:         req.user._id,
-          githubUsername: cleanUsername,
-          analysisId:     analysis._id,
-          label:          'comparison search',
-        });
+        // await SearchHistory.create({
+        //   userId:         req.user._id,
+        //   githubUsername: cleanUsername,
+        //   analysisId:     analysis._id,
+        //   label:          'comparison search',
+        // });
+
+        // save to search history if not exists, otherwise update timestamp
+        await SearchHistory.findOneAndUpdate(
+          {
+            userId: req.user._id,
+            githubUsername: cleanUsername,
+          },
+          {
+            $set: {
+              analysisId: analysis._id,
+              label: 'comparison search',
+              searchedAt: new Date(),
+            }
+          },
+          {
+            upsert: true,
+            returnDocument: 'after',
+          }
+        )
       }
 
       // Push clean result object
@@ -87,6 +106,7 @@ const compareUsers = asyncHandler(async (req, res) => {
         primaryLanguage: analysis.metrics.primaryLanguage,
         totalStars:      analysis.metrics.totalStars,
         scores:          analysis.scores,
+        analysisId:      analysis._id,
       });
 
     } catch (err) {
