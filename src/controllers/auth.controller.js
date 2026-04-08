@@ -90,4 +90,49 @@ const logout = asyncHandler(async(req, res) =>{
     return successResponse(res, 200, 'Logged out successfully');
 });
 
-module.exports = {register, login, getMe, logout};
+// ── PUT /api/auth/update-profile ──────────────────────────────────────────────
+const updateProfile = asyncHandler(async (req, res) => {
+    const { name } = req.body;
+  
+    if (!name || name.trim().length < 2) {
+      return errorResponse(res, 400, 'Name must be at least 2 characters');
+    }
+  
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { name: name.trim() },
+      { new: true, runValidators: true }
+    );
+  
+    return successResponse(res, 200, 'Profile updated successfully', { user });
+  });
+  
+  // ── PUT /api/auth/change-password ─────────────────────────────────────────────
+  const changePassword = asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+  
+    if (!currentPassword || !newPassword) {
+      return errorResponse(res, 400, 'Please provide current and new password');
+    }
+  
+    if (newPassword.length < 6) {
+      return errorResponse(res, 400, 'New password must be at least 6 characters');
+    }
+  
+    // Get user with password
+    const user = await User.findById(req.user._id).select('+password');
+  
+    // Verify current password
+    const isMatch = await user.matchPassword(currentPassword);
+    if (!isMatch) {
+      return errorResponse(res, 401, 'Current password is incorrect');
+    }
+  
+    // Set new password — pre save hook will hash it
+    user.password = newPassword;
+    await user.save();
+  
+    return successResponse(res, 200, 'Password changed successfully');
+  });
+  
+  module.exports = { register, login, getMe, logout, updateProfile, changePassword };
