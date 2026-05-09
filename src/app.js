@@ -9,13 +9,21 @@ const app = express();
 app.use(helmet());
 
 //cors - allow react frontend to call this API
-app.use(
-  cors({
-    origin: "https://frontend-deviq.vercel.app/", // React dev server
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
-  })
-);
+const allowedOrigins = [
+    "http://localhost:5173",
+    "https://frontend-deviq.vercel.app"
+  ];
+  
+  app.use(cors({
+    origin: function(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true
+}));
 
 //body parsers
 app.use(express.json({ limit: "10kb" }));
